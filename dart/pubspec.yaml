@@ -1,0 +1,16 @@
+name: qrmotion
+description: Animated QR codes where every frame still scans. Slide, jiggle, flip, ripple, spectrum and morph effects with a built-in verifier. Zero dependencies.
+version: 0.1.0
+topics: [qr, qrcode, animation]
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

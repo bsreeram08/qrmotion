@@ -289,7 +289,7 @@ function tint(rgb: RGB, hue = 0, shade = 0): RGB {
   if (!hue && !shade) return rgb;
   let [h, s, l] = toHsl(rgb);
   if (hue) s = Math.max(s, 0.65);
-  return fromHsl((h + hue) % 360, s, Math.min(1, Math.max(0, l + shade)));
+  return fromHsl((((h + hue) % 360) + 360) % 360, s, Math.min(1, Math.max(0, l + shade)));
 }
 
 function toHsl([r, g, b]: RGB): [number, number, number] {
