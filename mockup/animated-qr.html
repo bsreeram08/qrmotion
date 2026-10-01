@@ -1,0 +1,407 @@
+<title>Animated QR Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: lab bench. Lit paper stage with the live code on the left, control rail on the right; stacks on phones. */
+:root {
+  --bg: #0e0f15;
+  --panel: #161822;
+  --line: #2a2d3b;
+  --fg: #ebe8e1;
+  --muted: #9b9daf;
+  --accent: #ffb547;
+  --paper: #f5f2ea;
+  --ok: #5fd39a;
+  --bad: #ff6b6b;
+  --display: "Unbounded", "Arial Black", sans-serif;
+  --body: "Instrument Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1100px; margin: 0 auto; padding-inline: 20px; padding-block: 36px 56px; }
+header { display: grid; gap: 10px; margin-bottom: 28px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 700 clamp(28px, 5vw, 44px)/1.05 var(--display); margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 62ch; margin: 0; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 840px) { .grid { grid-template-columns: 1fr; } }
+
+.stage { background: radial-gradient(120% 90% at 50% 0%, #23263a 0%, var(--panel) 60%); border: 1px solid var(--line); border-radius: 20px; padding: 22px; display: grid; gap: 16px; }
+.qrbox { position: relative; width: 100%; max-width: 520px; aspect-ratio: 1; margin: 0 auto; box-shadow: 0 30px 80px -30px #000c; border-radius: 14px; }
+.qrbox canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; border-radius: 14px; }
+#map { pointer-events: none; }
+.meta { font: 400 12px/1.4 var(--mono); color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+
+.check { display: grid; gap: 10px; background: #0b0c12; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.check-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/1 var(--body); padding: 7px 12px; border-radius: 999px; background: #1d2a24; color: var(--ok); }
+.pill.bad { background: #2f1a1d; color: var(--bad); }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.count { font: 400 12px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-left: auto; }
+.strip { display: grid; grid-template-columns: repeat(60, 1fr); gap: 2px; height: 18px; }
+.strip i { border-radius: 2px; background: var(--line); }
+.strip i.y { background: var(--ok); }
+.strip i.n { background: var(--bad); }
+.decoded { font: 400 12px/1.4 var(--mono); color: var(--muted); overflow-wrap: anywhere; min-width: 0; }
+
+.rail { display: grid; gap: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px; min-width: 0; }
+.field { display: grid; gap: 8px; min-width: 0; }
+.label { font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+input[type=text] { font: 400 14px/1.3 var(--mono); color: var(--fg); background: #0b0c12; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; width: 100%; box-sizing: border-box; }
+input[type=text]:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.err { color: var(--bad); font-size: 13px; }
+
+.effects { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.fx { font: 500 14px/1.2 var(--body); color: var(--fg); background: #0b0c12; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; text-align: left; cursor: pointer; display: grid; gap: 3px; }
+.fx small { font: 400 11px/1.2 var(--mono); color: var(--muted); }
+.fx[aria-pressed=true] { border-color: var(--accent); background: #2a2214; }
+.fx.unsafe small { color: var(--bad); }
+.fxnote { color: var(--muted); font-size: 14px; margin: 0; min-height: 4.6em; }
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.seg { font: 500 13px/1 var(--mono); color: var(--fg); background: #0b0c12; border: 1px solid var(--line); border-radius: 8px; padding: 9px 0; width: 54px; cursor: pointer; display: grid; gap: 4px; justify-items: center; }
+.seg small { font-size: 10px; color: var(--muted); }
+.seg[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+.swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.swatch[aria-pressed=true] { border-color: var(--accent); box-shadow: 0 0 0 3px #ffb54733; }
+.btn { font: 500 13px/1 var(--body); color: var(--fg); background: #0b0c12; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+.btn[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+
+.rules { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.rule { border-top: 1px solid var(--line); padding-top: 14px; }
+.rule h3 { font: 500 15px/1.3 var(--display); margin: 0 0 6px; }
+.rule p { margin: 0; color: var(--muted); font-size: 14px; }
+.foot { margin-top: 28px; color: var(--muted); font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Mockup · every frame scans</span>
+    <h1>Animated QR Lab</h1>
+    <p class="lede">The code moves, but each frame stays a valid QR code. The panel under the code runs the live canvas through the jsQR decoder as it plays, so you can see whether a style really scans. Point a phone camera at it too.</p>
+  </header>
+
+  <div class="grid">
+    <section class="stage" aria-label="Live animated QR code">
+      <div class="qrbox">
+        <canvas id="qr" width="600" height="600" aria-label="Animated QR code"></canvas>
+        <canvas id="map" width="600" height="600" aria-hidden="true"></canvas>
+      </div>
+      <div class="meta" id="meta"></div>
+      <div class="check" aria-live="polite">
+        <div class="check-top">
+          <span class="pill" id="pill"><span class="dot"></span><span id="pillText">Decoding…</span></span>
+          <span class="count" id="count">0 / 0 frames decoded</span>
+        </div>
+        <div class="strip" id="strip"></div>
+        <div class="decoded" id="decoded">Waiting for the first check</div>
+      </div>
+    </section>
+
+    <aside class="rail">
+      <div class="field">
+        <label class="label" for="payload">Payload</label>
+        <input type="text" id="payload" value="https://example.com/animated-qr" spellcheck="false" autocomplete="off">
+        <span class="err" id="err" hidden></span>
+      </div>
+
+      <div class="field">
+        <span class="label">Effect</span>
+        <div class="effects" id="effects"></div>
+        <p class="fxnote" id="fxnote"></p>
+      </div>
+
+      <div class="field">
+        <span class="label">Error correction</span>
+        <div class="row" id="ecc"></div>
+      </div>
+
+      <div class="field">
+        <span class="label">Ink</span>
+        <div class="row" id="inks"></div>
+      </div>
+
+      <div class="row">
+        <button class="btn" id="play" type="button" aria-pressed="false">Pause</button>
+        <button class="btn" id="anat" type="button" aria-pressed="false">Show anatomy</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="rules">
+    <div class="rule"><h3>Frozen skeleton</h3><p>Finder eyes, timing lines, alignment squares, format info and the quiet zone never move. In anatomy view they're shaded amber.</p></div>
+    <div class="rule"><h3>Centers stay put</h3><p>Decoders only sample the center of each module. Size, shape, rotation and hue can change as long as the center keeps its lightness.</p></div>
+    <div class="rule"><h3>Checked in the loop</h3><p>Every few frames the canvas is decoded. Safe effects stay green. Drift shows what the validator has to catch.</p></div>
+  </div>
+  <p class="foot">Mockup built on qrcode-generator and jsQR. Scanning has not yet been tested on iPhone Camera or Google Lens with real phones.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+// Alignment pattern centers per version (ISO/IEC 18004 Annex E)
+const ALIGN = [null, [], [6,18], [6,22], [6,26], [6,30], [6,34], [6,22,38], [6,24,42], [6,26,46], [6,28,50],
+  [6,30,54], [6,32,58], [6,34,62], [6,26,46,66], [6,26,48,70], [6,26,50,74], [6,30,54,78], [6,30,56,82], [6,30,58,86], [6,34,62,90],
+  [6,28,50,72,94], [6,26,50,74,98], [6,30,54,78,102], [6,28,54,80,106], [6,32,58,84,110], [6,30,58,86,114], [6,34,62,90,118],
+  [6,26,50,74,98,122], [6,30,54,78,102,126], [6,26,52,78,104,130], [6,30,56,82,108,134], [6,34,60,86,112,138], [6,30,58,86,114,142],
+  [6,34,62,90,118,146], [6,30,54,78,102,126,150], [6,24,50,76,102,128,154], [6,28,54,80,106,132,158], [6,32,58,84,110,136,162],
+  [6,26,54,82,110,138,166], [6,30,58,86,114,142,170]];
+
+const EFFECTS = {
+  slide:    { name: 'Slide',    tag: 'boxes glide', note: 'Rows of boxes glide back and forth in opposite directions. Each box moves less than half a module, so it always covers its own center and never reaches a neighbor’s.' },
+  jiggle:   { name: 'Jiggle',   tag: 'boxes shake', note: 'Every box shakes and tilts on its own rhythm, staying within a third of a module of home.' },
+  flip:     { name: 'Flip',     tag: 'boxes turn',  note: 'Boxes turn like tiles on a board in a diagonal wave. The turn stops before a box goes edge-on, so the center stays dark.' },
+  ripple:  { name: 'Ripple',   tag: 'size wave',   note: 'Dots swell and shrink in a wave from the center. Each dot always covers the center of its module, which is the only point a decoder samples.' },
+  spectrum: { name: 'Spectrum', tag: 'hue flow',    note: 'Hue rotates across the code while lightness stays near 28%, so the dark/light threshold never moves.' },
+  morph:    { name: 'Morph',    tag: 'shape + spin', note: 'Every module spins and morphs between square and circle. Shape is free to change as long as the center stays dark.' },
+  sparkle:  { name: 'Sparkle',  tag: 'breathe + glints', note: 'Dots breathe on their own rhythm. Glints appear only where four light modules meet, never on a module center.' },
+  drift:    { name: 'Drift',    tag: 'unsafe', unsafe: true, note: 'Dots wander up to half a module off-center, so some centers go light. This is the kind of effect the validator has to reject. Watch the check strip.' },
+};
+const ECCS = [['L', '7%'], ['M', '15%'], ['Q', '25%'], ['H', '30%']];
+const INKS = [
+  { name: 'Night', base: '#17132a', hue: 255 },
+  { name: 'Teal',  base: '#0b3a40', hue: 185 },
+  { name: 'Oxblood', base: '#4a0f1f', hue: 345 },
+  { name: 'Forest', base: '#123524', hue: 150 },
+];
+const PAPER = '#f5f2ea', QUIET = 4, STRIP = 60;
+
+const $ = id => document.getElementById(id);
+const cv = $('qr'), ctx = cv.getContext('2d', { willReadFrequently: true });
+const mcv = $('map'), mctx = mcv.getContext('2d');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const state = { text: $('payload').value, ecc: 'Q', effect: 'slide', ink: 0, paused: reduce, map: false };
+let Q = null, t = 0, last = performance.now(), frame = 0, checks = [], passed = 0, total = 0;
+
+if (qrcode.stringToBytesFuncs && qrcode.stringToBytesFuncs['UTF-8']) qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+
+function build() {
+  let qr;
+  try {
+    qr = qrcode(0, state.ecc);
+    qr.addData(state.text || ' ');
+    qr.make();
+  } catch (e) {
+    $('err').textContent = `Too long for one code at level ${state.ecc}. Shorten the payload or pick a lower level.`;
+    $('err').hidden = false;
+    return;
+  }
+  $('err').hidden = true;
+  const n = qr.getModuleCount(), v = (n - 17) / 4;
+  const dark = new Uint8Array(n * n), fixed = new Uint8Array(n * n), phase = new Float32Array(n * n);
+  const mark = (r0, c0, h, w) => {
+    for (let r = r0; r < r0 + h; r++) for (let c = c0; c < c0 + w; c++)
+      if (r >= 0 && c >= 0 && r < n && c < n) fixed[r * n + c] = 1;
+  };
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    dark[r * n + c] = qr.isDark(r, c) ? 1 : 0;
+    phase[r * n + c] = Math.random();
+  }
+  // finders + separators + format info (the dark module sits inside the bottom-left block)
+  mark(0, 0, 9, 9); mark(0, n - 8, 9, 8); mark(n - 8, 0, 8, 9);
+  for (let i = 0; i < n; i++) { fixed[6 * n + i] = 1; fixed[i * n + 6] = 1; }
+  for (const a of ALIGN[v]) for (const b of ALIGN[v]) {
+    if ((a < 9 && b < 9) || (a < 9 && b > n - 10) || (a > n - 10 && b < 9)) continue;
+    mark(a - 2, b - 2, 5, 5);
+  }
+  if (v >= 7) { mark(0, n - 11, 6, 3); mark(n - 11, 0, 3, 6); }
+
+  // glint spots: grid corners where all four touching modules are light data modules
+  const glints = [];
+  const lightData = (r, c) => r >= 0 && c >= 0 && r < n && c < n && !dark[r * n + c] && !fixed[r * n + c];
+  for (let r = 1; r < n; r++) for (let c = 1; c < n; c++)
+    if (lightData(r - 1, c - 1) && lightData(r - 1, c) && lightData(r, c - 1) && lightData(r, c)) glints.push([r, c, Math.random()]);
+
+  const totalMods = n + QUIET * 2;
+  const cell = Math.floor(600 / totalMods);
+  cv.width = cv.height = mcv.width = mcv.height = cell * totalMods;
+  let animated = 0;
+  for (let i = 0; i < n * n; i++) if (dark[i] && !fixed[i]) animated++;
+  Q = { n, v, dark, fixed, phase, glints, cell };
+  $('meta').textContent = `Version ${v} · ${n}×${n} modules · level ${state.ecc} · ${animated} animated dots`;
+  resetChecks();
+  drawMap();
+  draw();
+}
+
+function resetChecks() { checks = []; passed = 0; total = 0; renderChecks(null); }
+
+function isFinder(r, c, n) { return (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7); }
+
+function eye(r, c, ink, cell) {
+  const x = (c + QUIET) * cell, y = (r + QUIET) * cell;
+  ctx.fillStyle = ink; ctx.beginPath(); ctx.roundRect(x, y, 7 * cell, 7 * cell, 1.4 * cell); ctx.fill();
+  ctx.fillStyle = PAPER; ctx.beginPath(); ctx.roundRect(x + cell, y + cell, 5 * cell, 5 * cell, 0.9 * cell); ctx.fill();
+  ctx.fillStyle = ink; ctx.beginPath(); ctx.roundRect(x + 2 * cell, y + 2 * cell, 3 * cell, 3 * cell, 0.7 * cell); ctx.fill();
+}
+
+function dot(cx, cy, d) { ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fill(); }
+
+function draw() {
+  if (!Q) return;
+  const { n, dark, fixed, phase, cell, glints } = Q, ink = INKS[state.ink], fx = state.effect;
+  const mid = (n - 1) / 2;
+  ctx.fillStyle = PAPER; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = ink.base;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const i = r * n + c;
+    if (!dark[i] || isFinder(r, c, n)) continue;
+    const x = (c + QUIET) * cell, y = (r + QUIET) * cell, cx = x + cell / 2, cy = y + cell / 2;
+    if (fixed[i]) { ctx.fillStyle = ink.base; ctx.fillRect(x, y, cell, cell); continue; }
+    const d = Math.hypot(r - mid, c - mid), p = phase[i];
+    if (fx === 'slide') {
+      // ponytail: |offset| < half the box keeps the center dark and neighbors' centers clear
+      ctx.fillStyle = ink.base;
+      const s = cell * 0.92, ox = cell * 0.42 * Math.sin(t * 2 + r * 0.45) * (r % 2 ? 1 : -1);
+      ctx.fillRect(cx - s / 2 + ox, cy - s / 2, s, s);
+    } else if (fx === 'jiggle') {
+      ctx.fillStyle = ink.base;
+      const s = cell * 0.9, a = p * 6.283;
+      ctx.save();
+      ctx.translate(cx + cell * 0.3 * Math.sin(t * 6.1 + a), cy + cell * 0.3 * Math.cos(t * 5.3 + a * 1.7));
+      ctx.rotate(0.18 * Math.sin(t * 4.4 + a * 2.3));
+      ctx.fillRect(-s / 2, -s / 2, s, s); ctx.restore();
+    } else if (fx === 'flip') {
+      const k = Math.cos(t * 2.4 - (r + c) * 0.28), w = cell * 0.92 * (0.5 + 0.5 * Math.abs(k)), h = cell * 0.92;
+      ctx.fillStyle = k < 0 ? `hsl(${ink.hue} 55% 24%)` : ink.base;
+      ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+    } else if (fx === 'ripple') {
+      ctx.fillStyle = ink.base;
+      dot(cx, cy, cell * (0.7 + 0.32 * (0.5 + 0.5 * Math.sin(d * 0.6 - t * 3.2))));
+    } else if (fx === 'spectrum') {
+      ctx.fillStyle = `hsl(${(ink.hue + t * 50 + (r + c) * 6) % 360} 70% 28%)`;
+      const s = cell * 0.9;
+      ctx.beginPath(); ctx.roundRect(cx - s / 2, cy - s / 2, s, s, s * 0.32); ctx.fill();
+    } else if (fx === 'morph') {
+      ctx.fillStyle = ink.base;
+      const s = cell * 0.82, rad = s * 0.5 * (0.5 + 0.5 * Math.sin(t * 1.3 + d * 0.22));
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * 1.2 + d * 0.25);
+      ctx.beginPath(); ctx.roundRect(-s / 2, -s / 2, s, s, rad); ctx.fill(); ctx.restore();
+    } else if (fx === 'sparkle') {
+      ctx.fillStyle = ink.base;
+      dot(cx, cy, cell * (0.72 + 0.3 * (0.5 + 0.5 * Math.sin(t * 2.2 + p * 6.283))));
+    } else if (fx === 'drift') {
+      ctx.fillStyle = ink.base;
+      const a = t * 1.6 + p * 6.283;
+      dot(cx + Math.cos(a) * cell * 0.5, cy + Math.sin(a * 1.3) * cell * 0.5, cell * 0.85);
+    }
+  }
+  eye(0, 0, ink.base, cell); eye(0, n - 7, ink.base, cell); eye(n - 7, 0, ink.base, cell);
+
+  if (fx === 'sparkle') {
+    ctx.fillStyle = '#e3a33a';
+    for (const [r, c, p] of glints) {
+      const k = Math.max(0, Math.sin(t * 1.7 + p * 6.283)) ** 6;
+      if (k < 0.02) continue;
+      const x = (c + QUIET) * cell, y = (r + QUIET) * cell, a = cell * 0.24 * k, b = a * 0.28;
+      ctx.beginPath();
+      ctx.moveTo(x, y - a); ctx.lineTo(x + b, y - b); ctx.lineTo(x + a, y); ctx.lineTo(x + b, y + b);
+      ctx.lineTo(x, y + a); ctx.lineTo(x - b, y + b); ctx.lineTo(x - a, y); ctx.lineTo(x - b, y - b);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+}
+
+function drawMap() {
+  mctx.clearRect(0, 0, mcv.width, mcv.height);
+  if (!state.map || !Q) return;
+  const { n, fixed, cell } = Q;
+  mctx.fillStyle = 'rgba(255,181,71,.22)';
+  mctx.fillRect(0, 0, mcv.width, QUIET * cell); mctx.fillRect(0, mcv.height - QUIET * cell, mcv.width, QUIET * cell);
+  mctx.fillRect(0, QUIET * cell, QUIET * cell, n * cell); mctx.fillRect(mcv.width - QUIET * cell, QUIET * cell, QUIET * cell, n * cell);
+  mctx.fillStyle = 'rgba(255,160,40,.5)';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++)
+    if (fixed[r * n + c]) mctx.fillRect((c + QUIET) * cell, (r + QUIET) * cell, cell, cell);
+}
+
+function scan() {
+  const img = ctx.getImageData(0, 0, cv.width, cv.height);
+  const res = jsQR(img.data, cv.width, cv.height, { inversionAttempts: 'dontInvert' });
+  const ok = !!res && res.data === (state.text || ' ');
+  total++; if (ok) passed++;
+  checks.push(ok); if (checks.length > STRIP) checks.shift();
+  renderChecks(res);
+}
+
+function renderChecks(res) {
+  const strip = $('strip');
+  strip.innerHTML = '';
+  for (let i = 0; i < STRIP; i++) {
+    const el = document.createElement('i');
+    if (i < checks.length) el.className = checks[i] ? 'y' : 'n';
+    strip.appendChild(el);
+  }
+  $('count').textContent = `${passed} / ${total} frames decoded`;
+  const recent = checks.slice(-20), fails = recent.filter(x => !x).length;
+  const pill = $('pill');
+  if (!total) { pill.className = 'pill'; $('pillText').textContent = 'Decoding…'; return; }
+  pill.className = fails ? 'pill bad' : 'pill';
+  $('pillText').textContent = fails ? `${fails} of the last ${recent.length} frames failed` : 'Every frame scans';
+  if (res) $('decoded').textContent = `Decoded: ${res.data}`;
+  else if (checks[checks.length - 1] === false) $('decoded').textContent = 'Last frame: no code found';
+}
+
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!state.paused) {
+    t += dt; draw();
+    if (++frame % 6 === 0) scan();
+  }
+  requestAnimationFrame(loop);
+}
+
+// controls
+const effectsEl = $('effects');
+for (const [key, e] of Object.entries(EFFECTS)) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'fx' + (e.unsafe ? ' unsafe' : ''); b.id = 'fx-' + key;
+  b.innerHTML = `${e.name}<small>${e.tag}</small>`;
+  b.onclick = () => { state.effect = key; syncEffects(); resetChecks(); draw(); if (state.paused) scan(); };
+  effectsEl.appendChild(b);
+}
+function syncEffects() {
+  for (const key in EFFECTS) $('fx-' + key).setAttribute('aria-pressed', key === state.effect);
+  $('fxnote').textContent = EFFECTS[state.effect].note;
+}
+
+for (const [lvl, pct] of ECCS) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'seg'; b.id = 'ecc-' + lvl;
+  b.innerHTML = `${lvl}<small>${pct}</small>`;
+  b.onclick = () => { state.ecc = lvl; syncEcc(); build(); };
+  $('ecc').appendChild(b);
+}
+function syncEcc() { for (const [l] of ECCS) $('ecc-' + l).setAttribute('aria-pressed', l === state.ecc); }
+
+INKS.forEach((ink, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'swatch'; b.id = 'ink-' + i; b.style.background = ink.base;
+  b.setAttribute('aria-label', ink.name + ' ink');
+  b.onclick = () => { state.ink = i; syncInk(); draw(); };
+  $('inks').appendChild(b);
+});
+function syncInk() { INKS.forEach((_, i) => $('ink-' + i).setAttribute('aria-pressed', i === state.ink)); }
+
+let typing;
+$('payload').addEventListener('input', e => {
+  clearTimeout(typing);
+  typing = setTimeout(() => { state.text = e.target.value; build(); }, 200);
+});
+$('play').onclick = () => {
+  state.paused = !state.paused;
+  $('play').textContent = state.paused ? 'Play' : 'Pause';
+  $('play').setAttribute('aria-pressed', state.paused);
+};
+$('anat').onclick = () => {
+  state.map = !state.map;
+  $('anat').setAttribute('aria-pressed', state.map);
+  $('anat').textContent = state.map ? 'Hide anatomy' : 'Show anatomy';
+  drawMap();
+};
+
+$('play').textContent = state.paused ? 'Play' : 'Pause';
+syncEffects(); syncEcc(); syncInk(); build();
+if (state.paused) scan();
+requestAnimationFrame(loop);
+</script>

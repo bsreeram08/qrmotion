@@ -1,0 +1,31 @@
+# qrmotion
+
+> Animated QR codes where every frame still scans. Zero runtime dependencies. ESM, TypeScript types included. Bun, Node 18+, Deno, browsers.
+
+## Quick answers
+
+- One call: `import { animatedQR } from '@bsreeram08/qrmotion'; const svg = animatedQR(text, { effect: 'slide' })` returns an animated SVG string.
+- Effects: slide (default), jiggle, flip, ripple, spectrum, morph, none.
+- Options: effect, ink (#hex, dark), paper (#hex, light), duration (seconds, default 2.4), quiet (modules, default 4), seed, ecc ('L'|'M'|'Q'|'H', default 'Q'), px (SVG width/height).
+- Errors: TypeError/RangeError with a fixable message (text too long, unknown effect, bad color, ink not darker than paper).
+
+## API
+
+- `encode(text, ecc?) -> QR` : { text, size, version, ecc, dark: Uint8Array, fixed: Uint8Array }
+- `toSVG(qr, opts?) -> string` : animated SVG, CSS keyframes, honors prefers-reduced-motion
+- `drawFrame(ctx, qr, opts?, t?, scale?)` : draw time t (seconds) to a CanvasRenderingContext2D
+- `rasterize(qr, opts?, t?, scale?) -> { width, height, data: Uint8ClampedArray }` : RGBA, no DOM needed
+- `toTerminal(qr, { ...opts, color?, scale? }, t?) -> string` : half-block text, ANSI 24-bit color when color: true
+- `verify(qr, opts?, frames?) -> { ok, frames, worst, worstAt }` : checks module middles on every sampled frame
+- `frameShapes(qr, opts?, t?) -> Shape[]` : geometry for custom renderers
+- `EFFECTS`, `EFFECT_NAMES`, `Effect` : built-ins; custom effects implement { name, description, size, radius, phase(r,c,d,rand), pose(u) }
+
+## LLM tool / MCP
+
+- `tool` : { name: 'animated_qr', description, inputSchema } (plain JSON Schema)
+- `runTool(input) -> { output, format, version, size, ecc, effect, verified }` : input { text, effect?, ecc?, ink?, paper?, duration?, format?: 'svg'|'terminal' }
+- MCP over stdio: `npx -y @bsreeram08/qrmotion mcp`
+
+## CLI
+
+- `qrmotion <text> [-e effect] [--ecc Q] [--ink #hex] [--paper #hex] [--svg file|-] [--json] [--once] [--mono]`

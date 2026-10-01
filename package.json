@@ -1,0 +1,29 @@
+{
+  "name": "@bsreeram08/qrmotion",
+  "version": "0.1.2",
+  "description": "Animated QR codes where every frame still scans. SVG, canvas, terminal, MCP and LLM tool output. Zero dependencies.",
+  "keywords": ["qr", "qrcode", "qr-code", "animated", "animation", "svg", "terminal", "mcp", "llm", "ai-tool", "zero-dependency"],
+  "license": "MIT",
+  "author": "bsreeram08",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./package.json": "./package.json"
+  },
+  "bin": { "qrmotion": "dist/cli.js" },
+  "files": ["dist", "llms.txt"],
+  "sideEffects": ["./dist/cli.js"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "test": "bun test",
+    "prepublishOnly": "bun run build && bun test"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "jsqr": "1.4.0",
+    "typescript": "7.0.2"
+  }
+}
