@@ -1,6 +1,6 @@
 {
   "name": "@bsreeram08/qrmotion",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Animated QR codes where every frame still scans. SVG, canvas, terminal, MCP and LLM tool output. Zero dependencies.",
   "keywords": ["qr", "qrcode", "qr-code", "animated", "animation", "svg", "terminal", "mcp", "llm", "ai-tool", "zero-dependency"],
   "license": "MIT",

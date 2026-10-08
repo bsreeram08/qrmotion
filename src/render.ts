@@ -14,6 +14,16 @@ export interface RenderOptions {
   quiet?: number;
   /** Seed for per-module randomness, so output is reproducible. Default 1. */
   seed?: number;
+  /** Second ink color. Set it to fill the body with a gradient from `ink` to `inkTo` (SVG only). Must also be much darker than paper. */
+  inkTo?: string;
+  /** Gradient shape when `inkTo` is set. Default "linear". */
+  gradient?: 'linear' | 'radial';
+  /** Linear gradient angle in degrees (0 = left to right, clockwise). Default 45. */
+  angle?: number;
+  /** Color of the dark parts of the finder eyes. Default `ink`. Must be much darker than paper. */
+  eyeColor?: string;
+  /** Corner style of the finder eyes. Default "rounded". */
+  eyeShape?: 'square' | 'rounded';
 }
 
 type RGB = [number, number, number];
@@ -35,6 +45,11 @@ interface Resolved {
   effect: Effect;
   ink: RGB;
   paper: RGB;
+  inkTo: RGB | null;
+  gradient: 'linear' | 'radial';
+  angle: number;
+  eyeColor: RGB;
+  eyeShape: 'square' | 'rounded';
   duration: number;
   quiet: number;
   rand: Float32Array;
@@ -45,8 +60,15 @@ const DEFAULT_INK = '#17132a', DEFAULT_PAPER = '#f5f2ea';
 function resolve(qr: QR, o: RenderOptions = {}): Resolved {
   const effect = resolveEffect(o.effect);
   const ink = parseHex(o.ink ?? DEFAULT_INK), paper = parseHex(o.paper ?? DEFAULT_PAPER);
-  if (luminance(paper) - luminance(ink) < 0.4)
-    throw new RangeError('ink must be much darker than paper (luminance gap of at least 0.4) or the code will not scan');
+  const dark = (c: RGB, what: string) => {
+    if (luminance(paper) - luminance(c) < 0.4)
+      throw new RangeError(`${what} must be much darker than paper (luminance gap of at least 0.4) or the code will not scan`);
+    return c;
+  };
+  dark(ink, 'ink');
+  const inkTo = o.inkTo != null ? dark(parseHex(o.inkTo), 'inkTo') : null;
+  const eyeColor = o.eyeColor != null ? dark(parseHex(o.eyeColor), 'eyeColor') : ink;
+  const gradient = o.gradient ?? 'linear', angle = o.angle ?? 45, eyeShape = o.eyeShape ?? 'rounded';
   const duration = o.duration ?? 2.4, quiet = o.quiet ?? 4;
   if (!(duration > 0)) throw new RangeError('duration must be a positive number of seconds');
   if (!(Number.isInteger(quiet) && quiet >= 0)) throw new RangeError('quiet must be a non-negative integer');
@@ -59,7 +81,7 @@ function resolve(qr: QR, o: RenderOptions = {}): Resolved {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     rand[i] = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
-  return { effect, ink, paper, duration, quiet, rand };
+  return { effect, ink, paper, inkTo, gradient, angle, eyeColor, eyeShape, duration, quiet, rand };
 }
 
 const frac = (x: number) => ((x % 1) + 1) % 1;
@@ -87,9 +109,11 @@ function shapes(qr: QR, o: Resolved, poseAt: (phase: number) => import('./effect
 }
 
 function eye(r: number, c: number, o: Resolved): Shape[] {
-  // concentric 7/5/3 rounded squares keep the 1:1:3:1:1 finder ratio
-  const at = (side: number, rad: number, fill: RGB): Shape => ({ cx: c + 3.5, cy: r + 3.5, w: side, h: side, rot: 0, r: rad, fill });
-  return [at(7, 1, o.ink), at(5, 0.9, o.paper), at(3, 0.7, o.ink)];
+  // concentric 7/5/3 squares keep the 1:1:3:1:1 finder ratio. "rounded" radii are capped so the
+  // corner module centers stay covered and verify() still passes; "square" is radius 0.
+  const k = o.eyeShape === 'square' ? 0 : 1;
+  const at = (side: number, rad: number, fill: RGB): Shape => ({ cx: c + 3.5, cy: r + 3.5, w: side, h: side, rot: 0, r: rad * k, fill });
+  return [at(7, 1, o.eyeColor), at(5, 0.9, o.paper), at(3, 0.7, o.eyeColor)];
 }
 
 /** Animated SVG (CSS keyframes). Respects prefers-reduced-motion. */
@@ -118,7 +142,22 @@ export function toSVG(qr: QR, opts: RenderOptions & { px?: number } = {}): strin
       + `@media (prefers-reduced-motion:reduce){.${id}{animation:none}}`;
   }
 
-  const ink = hex(o.ink);
+  // gradient spans the whole symbol (userSpaceOnUse), not each module. ponytail: a hue-cycling
+  // effect (spectrum/flip) sets per-module fill in its keyframes and will override the gradient.
+  let defs = '', bodyFill = hex(o.ink);
+  if (o.inkTo) {
+    const gid = id + 'g', a = hex(o.ink), b = hex(o.inkTo);
+    if (o.gradient === 'radial') {
+      defs = `<radialGradient id="${gid}" gradientUnits="userSpaceOnUse" cx="${N / 2}" cy="${N / 2}" r="${N / 2}">`
+        + `<stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></radialGradient>`;
+    } else {
+      const t = (o.angle * Math.PI) / 180, dx = Math.cos(t), dy = Math.sin(t);
+      const L = (N / 2) * (Math.abs(dx) + Math.abs(dy)), mx = N / 2, my = N / 2;
+      defs = `<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="${n4(mx - dx * L)}" y1="${n4(my - dy * L)}" x2="${n4(mx + dx * L)}" y2="${n4(my + dy * L)}">`
+        + `<stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`;
+    }
+    bodyFill = `url(#${gid})`;
+  }
   let body = '';
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
     const i = r * n + c;
@@ -135,7 +174,8 @@ export function toSVG(qr: QR, opts: RenderOptions & { px?: number } = {}): strin
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${N} ${N}" width="${px}" height="${px}" role="img" aria-label="QR code: ${escapeXml(qr.text)}">`
     + (keyframes ? `<style>${keyframes}</style>` : '')
-    + `<rect width="${N}" height="${N}" fill="${hex(o.paper)}"/><g fill="${ink}">${body}</g></svg>`;
+    + (defs ? `<defs>${defs}</defs>` : '')
+    + `<rect width="${N}" height="${N}" fill="${hex(o.paper)}"/><g fill="${bodyFill}">${body}</g></svg>`;
 }
 
 export interface Raster {

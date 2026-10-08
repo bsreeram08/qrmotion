@@ -2,7 +2,7 @@ import { encode, type Ecc } from './qr.js';
 import { EFFECTS, EFFECT_NAMES, type EffectName } from './effects.js';
 import { toSVG, toTerminal, verify } from './render.js';
 
-export const VERSION = '0.1.2';
+export const VERSION = '0.2.0';
 
 /**
  * Tool definition for LLM function calling. `inputSchema` is plain JSON Schema, so it plugs into
@@ -22,6 +22,11 @@ export const tool = {
       ecc: { type: 'string', enum: ['L', 'M', 'Q', 'H'], default: 'Q', description: 'Error correction level. Higher is sturdier but denser.' },
       ink: { type: 'string', pattern: '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', default: '#17132a', description: 'Dark color. Must be much darker than paper.' },
       paper: { type: 'string', pattern: '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', default: '#f5f2ea', description: 'Light background color.' },
+      inkTo: { type: 'string', pattern: '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', description: 'Second ink color: fills the body with a gradient from ink to inkTo (SVG only). Must also be much darker than paper.' },
+      gradient: { type: 'string', enum: ['linear', 'radial'], default: 'linear', description: 'Gradient shape when inkTo is set.' },
+      angle: { type: 'number', default: 45, description: 'Linear gradient angle in degrees.' },
+      eyeColor: { type: 'string', pattern: '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', description: 'Color of the finder eyes. Defaults to ink. Must be much darker than paper.' },
+      eyeShape: { type: 'string', enum: ['square', 'rounded'], default: 'rounded', description: 'Corner style of the finder eyes.' },
       duration: { type: 'number', minimum: 0.2, maximum: 60, default: 2.4, description: 'Seconds per animation loop.' },
       format: { type: 'string', enum: ['svg', 'terminal'], default: 'svg', description: 'svg for web pages and files, terminal for a plain-text preview.' },
     },
@@ -36,6 +41,11 @@ export interface ToolInput {
   ecc?: Ecc;
   ink?: string;
   paper?: string;
+  inkTo?: string;
+  gradient?: 'linear' | 'radial';
+  angle?: number;
+  eyeColor?: string;
+  eyeShape?: 'square' | 'rounded';
   duration?: number;
   format?: 'svg' | 'terminal';
 }
@@ -65,7 +75,7 @@ export function runTool(input: unknown): ToolOutput {
   if (format !== 'svg' && format !== 'terminal') throw new TypeError('format must be "svg" or "terminal"');
   const effect = i.effect ?? 'slide';
   const qr = encode(i.text, i.ecc ?? 'Q');
-  const opts = { effect, ink: i.ink, paper: i.paper, duration: i.duration };
+  const opts = { effect, ink: i.ink, paper: i.paper, inkTo: i.inkTo, gradient: i.gradient, angle: i.angle, eyeColor: i.eyeColor, eyeShape: i.eyeShape, duration: i.duration };
   const output = format === 'svg' ? toSVG(qr, opts) : toTerminal(qr, opts);
   return { output, format, version: qr.version, size: qr.size, ecc: qr.ecc, effect, verified: verify(qr, opts, 24).ok };
 }

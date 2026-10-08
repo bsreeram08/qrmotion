@@ -50,6 +50,27 @@ toTerminal(qr, { ...opts, color: true }, t);  // one frame as ANSI text
 | `morph` | Boxes spin and pulse in a wave from the center |
 | `none` | Static styled code |
 
+### Styling
+
+Beyond `ink`/`paper`, you can brand the code. Every option still runs through `verify()`, so a choice that would stop the code scanning is rejected.
+
+```ts
+animatedQR('https://example.com', {
+  inkTo: '#7a1f6a', gradient: 'radial',   // body gradient from ink to inkTo (SVG only)
+  eyeColor: '#b00020', eyeShape: 'square', // recolor and reshape the finder eyes
+});
+```
+
+| Option | What it does |
+|---|---|
+| `inkTo` | Second ink color. Fills the body with a gradient from `ink` to `inkTo` (SVG output). Must also be much darker than `paper`. |
+| `gradient` | `linear` (default) or `radial` gradient shape, when `inkTo` is set. |
+| `angle` | Linear gradient angle in degrees (default 45). |
+| `eyeColor` | Color of the finder eyes (defaults to `ink`). Must be much darker than `paper`. |
+| `eyeShape` | `rounded` (default) or `square` eye corners. |
+
+A hue-cycling effect (`spectrum`, `flip`) sets each module's color per frame and overrides a gradient; pair gradients with `slide`, `jiggle`, `ripple`, `morph` or `none`. CLI flags: `--ink-to`, `--gradient`, `--angle`, `--eye-color`, `--eye-shape`.
+
 ### Why it scans
 
 Scanners read the middle of each module. qrmotion never animates the finder eyes, timing lines, alignment squares, format/version info or quiet zone. Every other box keeps the middle of its own module covered (center ±0.2 modules) and stays out of its neighbors' middles. In practice that limits sideways movement to about a quarter of a module.

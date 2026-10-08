@@ -17,6 +17,11 @@ Options
       --ecc <L|M|Q|H>   error correction (default Q)
       --ink <#hex>      dark color (default #17132a)
       --paper <#hex>    light color (default #f5f2ea)
+      --ink-to <#hex>   second ink color: fills the body with a gradient (SVG only)
+      --gradient <k>    linear | radial (default linear)
+      --angle <deg>     linear gradient angle (default 45)
+      --eye-color <#hex> color of the finder eyes (default ink)
+      --eye-shape <k>   square | rounded (default rounded)
       --duration <s>    seconds per loop (default 2.4)
       --svg <file|->    write an animated SVG instead (- for stdout)
       --json            print { version, size, ecc, effect, verified, svg } as JSON
@@ -81,6 +86,11 @@ function main() {
     effect,
     ink: flags.ink as string | undefined,
     paper: flags.paper as string | undefined,
+    inkTo: flags['ink-to'] as string | undefined,
+    gradient: flags.gradient as 'linear' | 'radial' | undefined,
+    angle: flags.angle !== undefined ? Number(flags.angle) : undefined,
+    eyeColor: flags['eye-color'] as string | undefined,
+    eyeShape: flags['eye-shape'] as 'square' | 'rounded' | undefined,
     duration: num('duration', 2.4),
   };
 
